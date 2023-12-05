@@ -52,7 +52,7 @@ fn main() -> Result<(), anyhow::Error> {
             }
 
             if output_fell_behind {
-                eprintln!("output stream fell behind: try increasing latency");
+                eprintln!("[WARN] output stream fell behind: try increasing latency");
             }
         },
         err_fn,
@@ -77,7 +77,7 @@ fn main() -> Result<(), anyhow::Error> {
                 };
             }
             if input_fell_behind {
-                eprintln!("input stream fell behind: try increasing latency");
+                eprintln!("[WARN] input stream fell behind: try increasing latency");
             }
         },
         err_fn,
@@ -97,7 +97,10 @@ fn main() -> Result<(), anyhow::Error> {
 
             eprintln!("[DEBUG] heard and transcribed: {}", text);
             if is_signal_to_start_command(&text) {
-                println!("received signal to start recording command: {}", &text);
+                eprintln!(
+                    "[DEBUG] received signal to start recording command: {}",
+                    &text
+                );
 
                 let speech_ref = Arc::new(Mutex::new(Vec::<f32>::new()));
                 let speech_ref_here = Arc::clone(&speech_ref);
@@ -116,7 +119,7 @@ fn main() -> Result<(), anyhow::Error> {
                         let is_silence = data.iter().all(|sample| sample.abs() < 0.0005);
 
                         if is_silence {
-                            println!("silence for over a second");
+                            eprintln!("[INFO] silence for over a second");
                             let (lock, cvar) = &*signal;
                             let mut start = lock.lock().unwrap();
                             *start = true;
@@ -129,7 +132,7 @@ fn main() -> Result<(), anyhow::Error> {
 
                 input_stream.play()?;
 
-                println!("recording...");
+                eprintln!("[INFO] recording...");
                 let (lock, cvar) = &*signal_rec;
                 let mut start_guard = lock.lock().unwrap();
 
@@ -141,7 +144,7 @@ fn main() -> Result<(), anyhow::Error> {
 
                 let text = tr.transcribe(&data);
 
-                println!("text: {text}");
+                println!("[echo]: {text}");
             }
         }
     }
@@ -153,17 +156,17 @@ fn samples_over_a_period(config: &cpal::StreamConfig, period_ms: usize) -> usize
 }
 
 fn err_fn(err: cpal::StreamError) {
-    eprintln!("an error occurred on stream: {}", err);
+    eprintln!("[ERROR] an error occurred on stream: {}", err);
 }
 
 fn is_signal_to_start_command(text: &str) -> bool {
-    let candidates = ["hey,cowdy", "hey,coyote", "hey,cowedy", "hey"]; // Hey, Caldi
+    let candidates = ["hey", "hey,caldi"];
     candidates.iter().any(|c| text.to_lowercase().contains(c))
 }
 
 mod stt {
 
-    use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
+    use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
     pub struct Transcribe {
         ctx: WhisperContext,
@@ -174,7 +177,10 @@ mod stt {
             let path_to_model = "./models/ggml-base.en.bin";
 
             // load a context and model
-            let ctx = WhisperContext::new(path_to_model).expect("failed to load model");
+            // let ctx = WhisperContext::new(path_to_model).expect("failed to load model");
+            let ctx =
+                WhisperContext::new_with_params(path_to_model, WhisperContextParameters::default())
+                    .expect("failed to load model");
 
             Self { ctx }
         }
@@ -183,9 +189,12 @@ mod stt {
             let ctx = &self.ctx;
 
             // create a params object
-            let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 0 });
+            let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 2 });
+            let prompt = r#"[system] Get ready. The user will say "Hey, Caldi", and then they will pose some math problems. [user]"#;
+            let tokens = &ctx.tokenize(prompt, prompt.len()).unwrap();
 
-            params.set_n_threads(8);
+            params.set_tokens(tokens);
+            params.set_n_threads(12);
             params.set_print_special(false);
             params.set_print_progress(false);
             params.set_print_realtime(false);
