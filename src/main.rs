@@ -1,4 +1,7 @@
-use std::sync::{Arc, Condvar, Mutex};
+use std::{
+    sync::{Arc, Condvar, Mutex},
+    time::Duration,
+};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::HeapRb;
@@ -133,6 +136,7 @@ fn main() -> Result<(), anyhow::Error> {
                 input_stream.play()?;
 
                 eprintln!("[INFO] recording...");
+                std::thread::sleep(Duration::from_secs(3)); // wait at least 3 seconds?
                 let (lock, cvar) = &*signal_rec;
                 let mut start_guard = lock.lock().unwrap();
 
@@ -176,8 +180,6 @@ mod stt {
         pub fn new() -> Self {
             let path_to_model = "./models/ggml-base.en.bin";
 
-            // load a context and model
-            // let ctx = WhisperContext::new(path_to_model).expect("failed to load model");
             let ctx =
                 WhisperContext::new_with_params(path_to_model, WhisperContextParameters::default())
                     .expect("failed to load model");
@@ -194,7 +196,6 @@ mod stt {
             let tokens = &ctx.tokenize(prompt, prompt.len()).unwrap();
 
             params.set_tokens(tokens);
-            params.set_n_threads(12);
             params.set_print_special(false);
             params.set_print_progress(false);
             params.set_print_realtime(false);
