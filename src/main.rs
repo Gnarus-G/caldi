@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Condvar, Mutex},
-    time::Duration,
-};
+use std::sync::{Arc, Condvar, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::HeapRb;
@@ -31,16 +28,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // The buffer to share samples
     let ring = HeapRb::<f32>::new(latency_samples * 2);
-    let ring2 = HeapRb::<f32>::new(latency_samples * 2);
     let (mut producer, mut consumer) = ring.split();
-    let (mut producer2, mut consumer2) = ring2.split();
-
-    // Fill the samples with 0.0 equal to the length of the delay.
-    for _ in 0..latency_samples {
-        // The ring buffer has twice as much space as necessary to add latency here,
-        // so this should never fail
-        producer.push(0.0).unwrap();
-    }
 
     let input_stream = device.build_input_stream(
         &config,
@@ -51,7 +39,6 @@ fn main() -> Result<(), anyhow::Error> {
                 if producer.push(sample).is_err() {
                     output_fell_behind = true;
                 };
-                let _ = producer2.push(sample);
             }
 
             if output_fell_behind {
@@ -62,40 +49,13 @@ fn main() -> Result<(), anyhow::Error> {
         None,
     )?;
 
-    let out_device = host
-        .default_output_device()
-        .expect("failed to get speakers");
-
-    let output_stream = out_device.build_output_stream(
-        &config,
-        move |data: &mut [f32], _| {
-            let mut input_fell_behind = false;
-            for sample in data {
-                *sample = match consumer.pop() {
-                    Some(s) => s,
-                    None => {
-                        input_fell_behind = true;
-                        0.0
-                    }
-                };
-            }
-            if input_fell_behind {
-                eprintln!("[WARN] input stream fell behind: try increasing latency");
-            }
-        },
-        err_fn,
-        None,
-    )?;
-
     input_stream.play()?;
-
-    output_stream.play()?;
 
     let tr = stt::Transcribe::new();
 
     loop {
-        if consumer2.is_full() {
-            let data: Vec<_> = consumer2.pop_iter().collect();
+        if consumer.is_full() {
+            let data: Vec<_> = consumer.pop_iter().collect();
             let text = tr.transcribe(&data);
 
             eprintln!("[DEBUG] heard and transcribed: {}", text);
@@ -119,13 +79,11 @@ fn main() -> Result<(), anyhow::Error> {
                             s.push(sample);
                         }
 
-                        let is_silence = data.iter().all(|sample| sample.abs() < 0.0005);
-
-                        if is_silence {
+                        if is_silence(data) && !is_silence(&s) {
                             eprintln!("[INFO] silence for over a second");
                             let (lock, cvar) = &*signal;
-                            let mut start = lock.lock().unwrap();
-                            *start = true;
+                            let mut started = lock.lock().unwrap();
+                            *started = true;
                             cvar.notify_one();
                         }
                     },
@@ -136,7 +94,6 @@ fn main() -> Result<(), anyhow::Error> {
                 input_stream.play()?;
 
                 eprintln!("[INFO] recording...");
-                std::thread::sleep(Duration::from_secs(3)); // wait at least 3 seconds?
                 let (lock, cvar) = &*signal_rec;
                 let mut start_guard = lock.lock().unwrap();
 
@@ -152,6 +109,10 @@ fn main() -> Result<(), anyhow::Error> {
             }
         }
     }
+}
+
+fn is_silence(samples: &[f32]) -> bool {
+    samples.iter().all(|sample| sample.abs() < 0.0005)
 }
 
 fn samples_over_a_period(config: &cpal::StreamConfig, period_ms: usize) -> usize {
