@@ -1,10 +1,16 @@
 use std::sync::{Arc, Condvar, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::HeapRb;
 
 const WHISPER_SAMPLE_RATE: u32 = 16000;
 const WHISPER_CHANNEL_COUNT: u16 = 1; // mono because whisper wants it
+
+#[derive(Debug, PartialEq)]
+enum ListenState {
+    Waiting,
+    Listening,
+    Transcribing,
+}
 
 fn main() -> Result<(), anyhow::Error> {
     let host = cpal::default_host();
@@ -17,32 +23,60 @@ fn main() -> Result<(), anyhow::Error> {
     let config: cpal::StreamConfig = cpal::StreamConfig {
         channels: WHISPER_CHANNEL_COUNT,
         sample_rate: cpal::SampleRate(WHISPER_SAMPLE_RATE),
-        buffer_size: cpal::BufferSize::Fixed(WHISPER_SAMPLE_RATE * 2), // going for a buffer spanning 2
+        buffer_size: cpal::BufferSize::Fixed(WHISPER_SAMPLE_RATE * 4), // going for a buffer spanning 3
                                                                        // seconds
     };
 
-    let latency = 1000;
+    let speech_audio = Arc::new(Mutex::new(Vec::<f32>::new()));
+    let _speech_audio = Arc::clone(&speech_audio);
 
-    // Create a delay in case the input and output devices aren't synced.
-    let latency_samples = samples_over_a_period(&config, latency);
+    let signal = Arc::new((Mutex::new(ListenState::Waiting), Condvar::new()));
+    let _signal = Arc::clone(&signal);
 
-    // The buffer to share samples
-    let ring = HeapRb::<f32>::new(latency_samples * 2);
-    let (mut producer, mut consumer) = ring.split();
+    let tr = Arc::new(stt::Transcribe::new());
+    let _tr = Arc::clone(&tr);
 
     let input_stream = device.build_input_stream(
         &config,
         move |data: &[f32], _info| {
-            let mut output_fell_behind = false;
+            let mut state = signal.0.lock().unwrap();
 
-            for &sample in data {
-                if producer.push(sample).is_err() {
-                    output_fell_behind = true;
-                };
-            }
+            match *state {
+                ListenState::Waiting => {
+                    if is_silence(data) {
+                        eprintln!("[INFO] silence detected, still waiting");
+                        return;
+                    }
 
-            if output_fell_behind {
-                eprintln!("[WARN] output stream fell behind: try increasing latency");
+                    let text = _tr.transcribe(data);
+                    eprintln!("[DEBUG] heard and transcribed: {}", text);
+                    if is_signal_to_start_command(&text) {
+                        eprintln!(
+                            "[DEBUG] received signal to start recording command: {}",
+                            &text
+                        );
+
+                        eprintln!("[INFO] recording...");
+
+                        *state = ListenState::Listening;
+                    }
+                }
+                ListenState::Listening => {
+                    let mut s = _speech_audio.lock().unwrap();
+                    for &sample in data {
+                        s.push(sample);
+                    }
+
+                    if is_silence(data) && !is_silence(&s) {
+                        eprintln!("[INFO] silence detected");
+                        *state = ListenState::Transcribing;
+                        let (_, cvar) = &*signal;
+                        cvar.notify_one();
+                    }
+                }
+                ListenState::Transcribing => {
+                    eprintln!("[DEBUG] noop in input_stream, currently transcribing");
+                }
             }
         },
         err_fn,
@@ -51,73 +85,30 @@ fn main() -> Result<(), anyhow::Error> {
 
     input_stream.play()?;
 
-    let tr = stt::Transcribe::new();
-
     loop {
-        if consumer.is_full() {
-            let data: Vec<_> = consumer.pop_iter().collect();
-            let text = tr.transcribe(&data);
+        let (_state, cvar) = &*_signal;
+        let mut state = _state.lock().unwrap();
 
-            eprintln!("[DEBUG] heard and transcribed: {}", text);
-            if is_signal_to_start_command(&text) {
-                eprintln!(
-                    "[DEBUG] received signal to start recording command: {}",
-                    &text
-                );
-
-                let speech_ref = Arc::new(Mutex::new(Vec::<f32>::new()));
-                let speech_ref_here = Arc::clone(&speech_ref);
-
-                let signal = Arc::new((Mutex::new(false), Condvar::new()));
-                let signal_rec = Arc::clone(&signal);
-
-                let input_stream = device.build_input_stream(
-                    &config,
-                    move |data: &[f32], _info| {
-                        let mut s = speech_ref.lock().unwrap();
-                        for &sample in data {
-                            s.push(sample);
-                        }
-
-                        if is_silence(data) && !is_silence(&s) {
-                            eprintln!("[INFO] silence for over a second");
-                            let (lock, cvar) = &*signal;
-                            let mut started = lock.lock().unwrap();
-                            *started = true;
-                            cvar.notify_one();
-                        }
-                    },
-                    err_fn,
-                    None,
-                )?;
-
-                input_stream.play()?;
-
-                eprintln!("[INFO] recording...");
-                let (lock, cvar) = &*signal_rec;
-                let mut start_guard = lock.lock().unwrap();
-
-                while !*start_guard {
-                    start_guard = cvar.wait(start_guard).unwrap();
-                }
-
-                let data = speech_ref_here.lock().unwrap();
-
-                let text = tr.transcribe(&data);
-
-                println!("[echo]: {text}");
-            }
+        while *state != ListenState::Transcribing {
+            state = cvar.wait(state).unwrap();
         }
+
+        input_stream.pause()?;
+
+        let mut data = speech_audio.lock().unwrap();
+
+        let text = tr.transcribe(&data);
+
+        println!("[echo]: {text}");
+
+        *state = ListenState::Waiting;
+        data.clear();
+        input_stream.play()?;
     }
 }
 
 fn is_silence(samples: &[f32]) -> bool {
     samples.iter().all(|sample| sample.abs() < 0.0005)
-}
-
-fn samples_over_a_period(config: &cpal::StreamConfig, period_ms: usize) -> usize {
-    let latency_frames = (period_ms as f32 / 1_000.0) * config.sample_rate.0 as f32;
-    latency_frames as usize * config.channels as usize
 }
 
 fn err_fn(err: cpal::StreamError) {
@@ -130,7 +121,6 @@ fn is_signal_to_start_command(text: &str) -> bool {
 }
 
 mod stt {
-
     use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
     pub struct Transcribe {
