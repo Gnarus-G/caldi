@@ -2,6 +2,9 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
+const ASSISTANT_NAME: &str = "Caldi"; // Caldi is actually a bad name since it fails recognition
+                                      // too often
+
 const WHISPER_SAMPLE_RATE: u32 = 16000;
 const WHISPER_CHANNEL_COUNT: u16 = 1; // mono because whisper wants it
 
@@ -48,7 +51,9 @@ fn main() -> Result<(), anyhow::Error> {
                         return;
                     }
 
-                    let text = _tr.transcribe(data);
+                    let text = _tr.transcribe(data, 
+                          &format!(r#"[system] The user will probably say "Hey, {}", and if they don't then just repeat what they said. [user]"#, ASSISTANT_NAME));
+
                     eprintln!("[DEBUG] heard and transcribed: {}", text);
                     if is_signal_to_start_command(&text) {
                         eprintln!(
@@ -68,7 +73,7 @@ fn main() -> Result<(), anyhow::Error> {
                     }
 
                     if is_silence(data) && !is_silence(&s) {
-                        eprintln!("[INFO] silence detected");
+                        eprintln!("[INFO] silence detected after having spoken something");
                         *state = ListenState::Transcribing;
                         let (_, cvar) = &*signal;
                         cvar.notify_one();
@@ -97,7 +102,8 @@ fn main() -> Result<(), anyhow::Error> {
 
         let mut data = speech_audio.lock().unwrap();
 
-        let text = tr.transcribe(&data);
+        let prompt = r#"[system] Get ready. The user will pose some math problems. [user]"#;
+        let text = tr.transcribe(&data, prompt);
 
         println!("[echo]: {text}");
 
@@ -116,7 +122,7 @@ fn err_fn(err: cpal::StreamError) {
 }
 
 fn is_signal_to_start_command(text: &str) -> bool {
-    let candidates = ["hey", "hey,caldi"];
+    let candidates = ["hey", &format!("hey,{}", ASSISTANT_NAME)];
     candidates.iter().any(|c| text.to_lowercase().contains(c))
 }
 
@@ -138,15 +144,14 @@ mod stt {
             Self { ctx }
         }
 
-        pub fn transcribe(&self, audio_data: &[f32]) -> String {
+        pub fn transcribe(&self, audio_data: &[f32], prompt: &str) -> String {
             let ctx = &self.ctx;
 
-            // create a params object
             let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 2 });
-            let prompt = r#"[system] Get ready. The user will say "Hey, Caldi", and then they will pose some math problems. [user]"#;
-            let tokens = &ctx.tokenize(prompt, prompt.len()).unwrap();
 
+            let tokens = &ctx.tokenize(prompt, prompt.len()).unwrap();
             params.set_tokens(tokens);
+
             params.set_print_special(false);
             params.set_print_progress(false);
             params.set_print_realtime(false);
