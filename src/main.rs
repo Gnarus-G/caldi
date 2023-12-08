@@ -11,7 +11,7 @@ struct CLi {
 }
 
 impl CLi {
-    fn prompt(&self) -> String {
+    fn waiting_mode_transcription_prompt(&self) -> String {
         format!(
             r#"[system] The user will probably say "Hey, {}", and if they don't then just repeat what they said. [user]"#,
             self.assistant_name
@@ -74,7 +74,7 @@ fn main() -> Result<(), anyhow::Error> {
                         return;
                     }
 
-                    let text = _tr.transcribe(data, &cli.prompt());
+                    let text = _tr.transcribe(data, &cli.waiting_mode_transcription_prompt());
 
                     eprintln!("[DEBUG] heard and transcribed: {}", text);
                     if cli.is_signal_to_start_command(&text) {
