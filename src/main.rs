@@ -1,10 +1,28 @@
 use std::sync::{Arc, Condvar, Mutex};
 
+use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use tts::Tts;
 
-const ASSISTANT_NAME: &str = "Caldi"; // Caldi is actually a bad name since it fails recognition
-                                      // too often
+#[derive(Parser)]
+struct CLi {
+    #[clap(default_value = "Caldi")]
+    assistant_name: String,
+}
+
+impl CLi {
+    fn prompt(&self) -> String {
+        format!(
+            r#"[system] The user will probably say "Hey, {}", and if they don't then just repeat what they said. [user]"#,
+            self.assistant_name
+        )
+    }
+
+    fn is_signal_to_start_command(&self, text: &str) -> bool {
+        let text = text.trim().to_lowercase();
+        return text.starts_with("hey") && text.contains(&self.assistant_name.to_lowercase());
+    }
+}
 
 const WHISPER_SAMPLE_RATE: u32 = 16000;
 const WHISPER_CHANNEL_COUNT: u16 = 1; // mono because whisper wants it
@@ -17,6 +35,7 @@ enum ListenState {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    let cli = CLi::parse();
     let tts = Arc::new(Mutex::new(Tts::default()?));
     let _tts = Arc::clone(&tts);
 
@@ -55,10 +74,10 @@ fn main() -> Result<(), anyhow::Error> {
                         return;
                     }
 
-                    let text = _tr.transcribe(data, &prompt());
+                    let text = _tr.transcribe(data, &cli.prompt());
 
                     eprintln!("[DEBUG] heard and transcribed: {}", text);
-                    if is_signal_to_start_command(&text) {
+                    if cli.is_signal_to_start_command(&text) {
                         eprintln!(
                             "[DEBUG] received signal to start recording command: {}",
                             &text
@@ -124,24 +143,12 @@ fn main() -> Result<(), anyhow::Error> {
     }
 }
 
-fn prompt() -> String {
-    format!(
-        r#"[system] The user will probably say "Hey, {}", and if they don't then just repeat what they said. [user]"#,
-        ASSISTANT_NAME
-    )
-}
-
 fn is_silence(samples: &[f32]) -> bool {
     samples.iter().all(|sample| sample.abs() < 0.0005)
 }
 
 fn err_fn(err: cpal::StreamError) {
     eprintln!("[ERROR] an error occurred on stream: {}", err);
-}
-
-fn is_signal_to_start_command(text: &str) -> bool {
-    let text = text.trim().to_lowercase();
-    return text.starts_with("hey") && text.contains(&ASSISTANT_NAME.to_lowercase());
 }
 
 mod stt {
