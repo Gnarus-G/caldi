@@ -172,15 +172,17 @@ mod stt {
         pub fn transcribe(&self, audio_data: &[f32], prompt: &str) -> String {
             let ctx = &self.ctx;
 
-            let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 2 });
+            let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
 
             let tokens = &ctx.tokenize(prompt, prompt.len()).unwrap();
             params.set_tokens(tokens);
 
-            params.set_print_special(false);
+            params.set_n_threads(1);
             params.set_print_progress(false);
             params.set_print_realtime(false);
             params.set_print_timestamps(false);
+            params.set_no_context(true);
+            params.set_suppress_non_speech_tokens(true);
 
             // now we can run the model
             let mut state = ctx.create_state().expect("failed to create state");
@@ -191,7 +193,8 @@ mod stt {
                 .full_n_segments()
                 .expect("failed to get number of segments");
 
-            let mut text = String::new();
+            // average english word length is 5.1 characters which we round up to 6
+            let mut text = String::with_capacity(6 * num_segments as usize);
 
             for i in 0..num_segments {
                 let segment = state
