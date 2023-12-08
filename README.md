@@ -2,6 +2,20 @@
 
 Voice commanded calculator in the terminal.
 
+## Setup Whisper
+
+[OpenCL](https://github.com/ggerganov/whisper.cpp/#opencl-gpu-support-via-clblast)
+
+```sh
+sudo pacman -S opencl clinfo clblast
+```
+
+[OpenBlas](https://github.com/ggerganov/whisper.cpp/#blas-cpu-support-via-openblas)
+
+```sh
+sudo pacman -S openblas
+```
+
 ## Setup TTS
 
 References:
