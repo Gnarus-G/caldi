@@ -1,6 +1,7 @@
 use std::sync::{Arc, Condvar, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use tts::Tts;
 
 const ASSISTANT_NAME: &str = "Caldi"; // Caldi is actually a bad name since it fails recognition
                                       // too often
@@ -16,6 +17,9 @@ enum ListenState {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    let tts = Arc::new(Mutex::new(Tts::default()?));
+    let _tts = Arc::clone(&tts);
+
     let host = cpal::default_host();
 
     let device = host
@@ -51,8 +55,7 @@ fn main() -> Result<(), anyhow::Error> {
                         return;
                     }
 
-                    let text = _tr.transcribe(data, 
-                          &format!(r#"[system] The user will probably say "Hey, {}", and if they don't then just repeat what they said. [user]"#, ASSISTANT_NAME));
+                    let text = _tr.transcribe(data, &prompt());
 
                     eprintln!("[DEBUG] heard and transcribed: {}", text);
                     if is_signal_to_start_command(&text) {
@@ -62,6 +65,11 @@ fn main() -> Result<(), anyhow::Error> {
                         );
 
                         eprintln!("[INFO] recording...");
+
+                        _tts.lock()
+                            .unwrap()
+                            .speak("Ready!", false)
+                            .expect("failed to speak");
 
                         *state = ListenState::Listening;
                     }
@@ -106,11 +114,21 @@ fn main() -> Result<(), anyhow::Error> {
         let text = tr.transcribe(&data, prompt);
 
         println!("[echo]: {text}");
+        tts.lock()
+            .unwrap()
+            .speak(&format!("I heard you say, {text}"), false)?;
 
         *state = ListenState::Waiting;
         data.clear();
         input_stream.play()?;
     }
+}
+
+fn prompt() -> String {
+    format!(
+        r#"[system] The user will probably say "Hey, {}", and if they don't then just repeat what they said. [user]"#,
+        ASSISTANT_NAME
+    )
 }
 
 fn is_silence(samples: &[f32]) -> bool {
@@ -122,8 +140,8 @@ fn err_fn(err: cpal::StreamError) {
 }
 
 fn is_signal_to_start_command(text: &str) -> bool {
-    let candidates = ["hey", &format!("hey,{}", ASSISTANT_NAME)];
-    candidates.iter().any(|c| text.to_lowercase().contains(c))
+    let text = text.trim().to_lowercase();
+    return text.starts_with("hey") && text.contains(&ASSISTANT_NAME.to_lowercase());
 }
 
 mod stt {
