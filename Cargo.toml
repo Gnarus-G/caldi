@@ -10,5 +10,6 @@ anyhow = "1.0.75"
 clap = { version = "4.4.11", features = ["derive"] }
 cpal = "0.15.2"
 hound = "3.5.1"
+ringbuf = "0.3.3"
 tts = "0.25.6"
 whisper-rs = { version = "0.10.0", features = ["opencl", "openblas"] }

@@ -4,6 +4,7 @@ mod stt;
 
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use ringbuf::{LocalRb, Rb};
 use tts::Tts;
 
 #[derive(Parser)]
@@ -47,13 +48,16 @@ fn main() -> Result<(), anyhow::Error> {
         .default_input_device()
         .expect("failed to get input device");
 
+    let audio_input_buffer_size = WHISPER_SAMPLE_RATE * 2; // going for a buffer spanning 2 seconds
+
     // We'll try and use the same configuration between streams to keep it simple.
     let config: cpal::StreamConfig = cpal::StreamConfig {
         channels: WHISPER_CHANNEL_COUNT,
         sample_rate: cpal::SampleRate(WHISPER_SAMPLE_RATE),
-        buffer_size: cpal::BufferSize::Fixed(WHISPER_SAMPLE_RATE * 4), // going for a buffer spanning 3
-                                                                       // seconds
+        buffer_size: cpal::BufferSize::Fixed(audio_input_buffer_size),
     };
+
+    let mut waiting_audio = LocalRb::new(audio_input_buffer_size as usize * 2);
 
     let speech_audio = Arc::new(Mutex::new(Vec::<f32>::new()));
     let _speech_audio = Arc::clone(&speech_audio);
@@ -71,6 +75,11 @@ fn main() -> Result<(), anyhow::Error> {
 
             match *state {
                 ListenState::Waiting => {
+                    waiting_audio.push_slice_overwrite(data);
+
+                    let (first, second) = waiting_audio.as_slices();
+                    let data = &[first, second].concat();
+
                     if is_silence(data) {
                         eprintln!("[INFO] silence detected, still waiting");
                         return;
@@ -93,6 +102,9 @@ fn main() -> Result<(), anyhow::Error> {
                             .expect("failed to speak");
 
                         *state = ListenState::Listening;
+                        waiting_audio.clear();
+                    } else if !text.to_lowercase().trim_start().starts_with("hey") {
+                        waiting_audio.clear();
                     }
                 }
                 ListenState::Listening => {
