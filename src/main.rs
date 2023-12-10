@@ -116,14 +116,6 @@ impl AssistantInterface {
                                 &text
                             );
 
-                            eprintln!("[INFO] recording...");
-
-                            _tts.lock()
-                                .unwrap()
-                                .speak("Ready!", false)
-                                .expect("failed to speak");
-
-                            std::thread::sleep(std::time::Duration::from_secs(1));
                             *state = ListenState::PreListening;
                         }
                     }
@@ -133,6 +125,13 @@ impl AssistantInterface {
                         // causing the Listening phase to end early with nonsense in it
                         *state = ListenState::Listening;
                         waiting_audio.clear();
+
+                        eprintln!("[INFO] recording...");
+
+                        _tts.lock()
+                            .unwrap()
+                            .speak("Ready!", false)
+                            .expect("failed to speak");
                     }
                     ListenState::Listening => {
                         let mut s = _speech_audio.lock().unwrap();
