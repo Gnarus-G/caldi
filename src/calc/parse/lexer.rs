@@ -1,7 +1,10 @@
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenKind {
     Ident,
     Integer,
+    Minus,
+    Times,
+    Over,
     Plus,
     Eof,
     Illegal,
@@ -88,6 +91,21 @@ impl<'s> Lexer<'s> {
                 text: "+",
             },
 
+            '-' => Token {
+                kind: TokenKind::Minus,
+                text: "-",
+            },
+
+            '*' => Token {
+                kind: TokenKind::Times,
+                text: "*",
+            },
+
+            '/' => Token {
+                kind: TokenKind::Over,
+                text: "/",
+            },
+
             c if c.is_ascii_digit() => {
                 let start = self.position;
 
@@ -108,7 +126,11 @@ impl<'s> Lexer<'s> {
             c if c.is_alphabetic() => {
                 let start = self.position;
 
-                while self.peek_char().unwrap_or('\0').is_alphabetic() {
+                while self
+                    .peek_char()
+                    .map(|c| c.is_alphabetic() || c == ' ')
+                    .unwrap_or(false)
+                {
                     self.advance();
                 }
 
@@ -116,9 +138,25 @@ impl<'s> Lexer<'s> {
 
                 let string = &self.input[start..=end];
 
-                let kind = match string {
+                let kind = match string.trim() {
                     "plus" => TokenKind::Plus,
-                    _ => TokenKind::Ident,
+                    "minus" => TokenKind::Minus,
+                    "times" => TokenKind::Times,
+                    "over" => TokenKind::Over,
+                    "negative" => TokenKind::Minus,
+                    "multiplied by" => TokenKind::Times,
+                    "divided by" => TokenKind::Over,
+                    _ => {
+                        string.split_whitespace().for_each(|ident| {
+                            let token = Token {
+                                kind: TokenKind::Ident,
+                                text: ident,
+                            };
+                            self.tokens.push(token);
+                        });
+                        self.advance();
+                        return;
+                    }
                 };
 
                 Token { kind, text: string }

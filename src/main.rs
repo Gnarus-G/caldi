@@ -7,6 +7,7 @@ use std::{
 mod calc;
 mod stt;
 
+use anyhow::Context;
 use calc::eval;
 use clap::{Args, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -185,7 +186,7 @@ impl AssistantInterface {
             tts.lock().unwrap().speak(
                 answer
                     .map(|a| a.to_string())
-                    .unwrap_or_else(|| "Sorry I couldn't evaluate that problem".to_string()),
+                    .unwrap_or_else(|err| err.to_string()),
                 false,
             )?;
 
@@ -221,8 +222,9 @@ fn main() -> Result<(), anyhow::Error> {
                     .map(|ans| {
                         println!("{ans}");
                     })
-                    .unwrap_or_else(|| {
-                        println!("Something went wrong");
+                    .context("Something went wrong")
+                    .unwrap_or_else(|e| {
+                        println!("{e:#}");
                     });
 
                 print!(":> ");

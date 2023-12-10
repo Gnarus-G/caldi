@@ -5,7 +5,7 @@ use self::parse::{
 
 mod parse;
 
-pub fn eval(source: &str) -> Option<isize> {
+pub fn eval(source: &str) -> parse::Result<isize> {
     let mut parser = Parser::new(source);
 
     let expr = parser.parse();
@@ -26,7 +26,10 @@ fn eval_binary_expr(expr: &BinaryExpr) -> isize {
     let right = eval_expr(&expr.right);
 
     match expr.op {
-        parse::ast::Op::Plus => left + right,
+        parse::ast::BinOp::Plus => left + right,
+        parse::ast::BinOp::Minus => left - right,
+        parse::ast::BinOp::Times => left * right,
+        parse::ast::BinOp::Over => left / right,
     }
 }
 
@@ -34,6 +37,7 @@ fn eval_unary_expr(expr: &UnaryExpr) -> isize {
     let number = eval_expr(&expr.right);
 
     match expr.op {
-        parse::ast::Op::Plus => number,
+        parse::ast::UnOp::Plus => number,
+        parse::ast::UnOp::Minus => -number,
     }
 }
