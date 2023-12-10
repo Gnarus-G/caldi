@@ -54,5 +54,5 @@ festival --server &
 ```sh
 festival --server &
 sleep 1 # give festival some time to boot up
-~/.cargo/bin/caldi assistant '<path to a ggml bin file>' 1> ~/cali.log &
+~/.cargo/bin/caldi assistant '<path to a ggml bin file>' 1> ~/caldi.log &
 ```
