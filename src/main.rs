@@ -47,7 +47,10 @@ impl AssistantInterface {
 
     fn is_signal_to_start_command(&self, text: &str) -> bool {
         let text = text.trim().to_lowercase();
-        return text.starts_with("hey") && text.contains(&self.assistant_name.to_lowercase());
+        if let Some(hey_at) = text.find("hey") {
+            return text[(hey_at + 3)..].contains(&self.assistant_name.to_lowercase());
+        };
+        return false;
     }
 
     fn handle(self) -> anyhow::Result<()> {
@@ -122,9 +125,6 @@ impl AssistantInterface {
 
                             std::thread::sleep(std::time::Duration::from_secs(1));
                             *state = ListenState::PreListening;
-                            waiting_audio.clear();
-                        } else if !text.to_lowercase().trim_start().starts_with("hey") {
-                            waiting_audio.clear();
                         }
                     }
                     ListenState::PreListening => {
@@ -132,6 +132,7 @@ impl AssistantInterface {
                         // waiting phase that would pollute the start the Listening
                         // causing the Listening phase to end early with nonsense in it
                         *state = ListenState::Listening;
+                        waiting_audio.clear();
                     }
                     ListenState::Listening => {
                         let mut s = _speech_audio.lock().unwrap();
