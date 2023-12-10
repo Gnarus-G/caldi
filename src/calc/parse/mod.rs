@@ -1,5 +1,5 @@
 use self::{
-    ast::{BinaryExpr, Expr, UnaryExpr},
+    ast::{BinOp, BinaryExpr, Expr, UnaryExpr},
     lexer::{Lexer, Token, TokenKind},
 };
 
@@ -18,7 +18,7 @@ impl<'s> Parser<'s> {
         Self {
             tokens: Lexer::new(input).tokenize(),
             position: 0,
-            read_position: 0,
+            read_position: 1,
         }
     }
 
@@ -52,49 +52,55 @@ impl<'s> Parser<'s> {
     }
 
     pub fn parse(&mut self) -> Result<Expr> {
-        self.advance();
+        self.parse_expr(Precedence::default())
+    }
 
-        match self.token() {
+    fn parse_expr(&mut self, curr_precedence: Precedence) -> Result<Expr> {
+        let mut exp = match self.token() {
             Some(token) => match token.kind {
-                TokenKind::Ident => self.parse(),
-                TokenKind::Integer
-                    if self.peek_token().map(|t| t.kind).unwrap_or(TokenKind::Eof)
-                        == TokenKind::Plus =>
-                {
-                    self.parse_binary_expr(ast::BinOp::Plus)
+                TokenKind::Ident => {
+                    self.advance(); // skipping identifiers
+                    self.parse()?
                 }
-                TokenKind::Integer
-                    if self.peek_token().map(|t| t.kind).unwrap_or(TokenKind::Eof)
-                        == TokenKind::Minus =>
-                {
-                    self.parse_binary_expr(ast::BinOp::Minus)
+                TokenKind::Integer => self.parse_number(),
+                TokenKind::Plus => self.parse_unary_expr()?,
+                TokenKind::Minus => self.parse_unary_expr()?,
+                TokenKind::Times => {
+                    return Err(error::ErrorKind::UnexpectedToken {
+                        token: token.into(),
+                    })
                 }
-                TokenKind::Integer
-                    if self.peek_token().map(|t| t.kind).unwrap_or(TokenKind::Eof)
-                        == TokenKind::Times =>
-                {
-                    self.parse_binary_expr(ast::BinOp::Times)
+                TokenKind::Over => {
+                    return Err(error::ErrorKind::UnexpectedToken {
+                        token: token.into(),
+                    })
                 }
-                TokenKind::Integer
-                    if self.peek_token().map(|t| t.kind).unwrap_or(TokenKind::Eof)
-                        == TokenKind::Over =>
-                {
-                    self.parse_binary_expr(ast::BinOp::Over)
+                TokenKind::Eof => return Err(error::ErrorKind::UnexpectedEnd { at: 0 }),
+                TokenKind::Illegal => {
+                    self.advance(); // skipping any illegal characters
+                    self.parse()?
                 }
-                TokenKind::Integer => Ok(self.parse_number()),
-                TokenKind::Plus => self.parse_unary_expr(ast::UnOp::Plus),
-                TokenKind::Minus => self.parse_unary_expr(ast::UnOp::Minus),
-                TokenKind::Times => Err(error::ErrorKind::UnexpectedToken {
-                    token: token.into(),
-                }),
-                TokenKind::Over => Err(error::ErrorKind::UnexpectedToken {
-                    token: token.into(),
-                }),
-                TokenKind::Eof => Err(error::ErrorKind::UnexpectedEnd { at: 0 }),
-                TokenKind::Illegal => self.parse(),
             },
-            None => Err(error::ErrorKind::UnexpectedEnd { at: 0 }),
+            None => return Err(error::ErrorKind::UnexpectedEnd { at: 0 }),
+        };
+
+        let peek_precedence: Precedence = match self.peek_token().map(|t| t.try_into()) {
+            Some(Ok(p)) => p,
+            Some(Err(_)) => return Ok(exp),
+            None => return Ok(exp),
+        };
+
+        while self
+            .peek_token()
+            .map(|t| t.kind != TokenKind::Eof)
+            .unwrap_or(false)
+            && curr_precedence < peek_precedence
+        {
+            self.advance();
+            exp = self.parse_binary_expr(exp)?;
         }
+
+        Ok(exp)
     }
 
     fn parse_number(&self) -> Expr {
@@ -105,21 +111,74 @@ impl<'s> Parser<'s> {
         ))
     }
 
-    fn parse_unary_expr(&mut self, op: ast::UnOp) -> Result<Expr> {
+    fn parse_unary_expr(&mut self) -> Result<Expr> {
+        let op: ast::UnOp = match self.token().map(|t| t.try_into()) {
+            Some(Ok(op)) => op,
+            Some(Err(token)) => {
+                return Err(error::ErrorKind::UnexpectedToken {
+                    token: token.into(),
+                })
+            }
+            None => return Err(error::ErrorKind::UnexpectedEnd { at: 0 }),
+        };
+
+        self.advance();
+
         let number = self.parse()?;
         Ok(Expr::UnExpr(Box::new(UnaryExpr { op, right: number })))
     }
 
-    fn parse_binary_expr(&mut self, op: ast::BinOp) -> Result<Expr> {
-        let left = self.parse_number();
-        self.advance();
-        let right = self.parse()?;
+    fn parse_binary_expr(&mut self, left: Expr) -> Result<Expr> {
+        let op: BinOp = match self.token().map(|t| t.try_into()) {
+            Some(Ok(op)) => op,
+            Some(Err(token)) => {
+                return Err(error::ErrorKind::UnexpectedToken {
+                    token: token.into(),
+                })
+            }
+            None => return Err(error::ErrorKind::UnexpectedEnd { at: 1 }),
+        };
 
-        Ok(Expr::BinExpr(Box::new(BinaryExpr { left, right, op })))
+        self.advance();
+
+        Ok(Expr::BinExpr(Box::new(BinaryExpr {
+            left,
+            op,
+            right: self.parse_expr(op.into())?,
+        })))
+    }
+}
+
+#[derive(Debug, Default, PartialEq, PartialOrd)]
+enum Precedence {
+    #[default]
+    None,
+    Sum,
+    Product,
+}
+
+impl From<BinOp> for Precedence {
+    fn from(value: BinOp) -> Self {
+        match value {
+            BinOp::Plus => Self::Sum,
+            BinOp::Minus => Self::Sum,
+            BinOp::Times => Self::Product,
+            BinOp::Over => Self::Product,
+        }
+    }
+}
+
+impl<'t, 's> TryFrom<&'t Token<'s>> for Precedence {
+    type Error = &'t Token<'s>;
+
+    fn try_from(value: &'t Token<'s>) -> std::prelude::v1::Result<Self, Self::Error> {
+        BinOp::try_from(value).map(Precedence::from)
     }
 }
 
 pub mod ast {
+    use super::lexer::Token;
+
     #[derive(Debug)]
     pub enum Expr {
         Interger(isize),
@@ -140,7 +199,7 @@ pub mod ast {
         pub right: Expr,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub enum BinOp {
         Plus,
         Minus,
@@ -148,10 +207,40 @@ pub mod ast {
         Over,
     }
 
+    impl<'t, 's> TryFrom<&'t Token<'s>> for BinOp {
+        type Error = &'t Token<'s>;
+
+        fn try_from(value: &'t Token<'s>) -> Result<Self, Self::Error> {
+            let r = match value.kind {
+                super::lexer::TokenKind::Minus => BinOp::Minus,
+                super::lexer::TokenKind::Times => BinOp::Times,
+                super::lexer::TokenKind::Over => BinOp::Over,
+                super::lexer::TokenKind::Plus => BinOp::Plus,
+                _ => return Err(value),
+            };
+
+            Ok(r)
+        }
+    }
+
     #[derive(Debug)]
     pub enum UnOp {
         Plus,
         Minus,
+    }
+
+    impl<'t, 's> TryFrom<&'t Token<'s>> for UnOp {
+        type Error = &'t Token<'s>;
+
+        fn try_from(value: &'t Token<'s>) -> Result<Self, Self::Error> {
+            let r = match value.kind {
+                super::lexer::TokenKind::Minus => UnOp::Minus,
+                super::lexer::TokenKind::Plus => UnOp::Plus,
+                _ => return Err(value),
+            };
+
+            Ok(r)
+        }
     }
 }
 

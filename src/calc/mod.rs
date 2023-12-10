@@ -8,8 +8,11 @@ mod parse;
 pub fn eval(source: &str) -> parse::Result<isize> {
     let mut parser = Parser::new(source);
 
-    let expr = parser.parse();
-    expr.map(|expr| eval_expr(&expr))
+    let expr = parser.parse()?;
+
+    eprintln!("[DEBUG] ast: {expr:?}");
+
+    Ok(eval_expr(&expr))
 }
 
 fn eval_expr(expr: &Expr) -> isize {
@@ -39,5 +42,40 @@ fn eval_unary_expr(expr: &UnaryExpr) -> isize {
     match expr.op {
         parse::ast::UnOp::Plus => number,
         parse::ast::UnOp::Minus => -number,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::calc::eval;
+
+    macro_rules! assert_evals {
+        ($expr:literal, $ans:literal) => {
+            assert_eq!(eval($expr).unwrap(), $ans)
+        };
+    }
+
+    #[test]
+    fn sums() {
+        assert_evals!("3 + 2", 5);
+        assert_evals!("3 - 2", 1);
+        assert_evals!("75 + 100", 175);
+        assert_evals!("75 - 100", -25);
+        assert_evals!("75 + 1000 - 100", 975);
+        assert_evals!("1000 + 75 - 100", 975);
+    }
+
+    #[test]
+    fn products() {
+        assert_evals!("3 * 2", 6);
+        assert_evals!("89 * 34", 3026);
+        assert_evals!("89 * 34 * 23 * 199", 13850002);
+        assert_evals!("9 / 2", 4);
+        assert_evals!("256 * 9 / 2", 1152);
+    }
+
+    #[test]
+    fn pemdas() {
+        assert_evals!("9 * 2 / 3 + 6 - 4 + 2", 10)
     }
 }

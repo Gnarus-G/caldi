@@ -10,6 +10,7 @@ pub enum TokenKind {
     Illegal,
 }
 
+#[derive(Debug)]
 pub struct Token<'s> {
     pub kind: TokenKind,
     pub text: &'s str,
