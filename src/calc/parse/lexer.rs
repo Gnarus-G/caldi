@@ -31,7 +31,7 @@ impl<'s> Lexer<'s> {
             input,
             input_bytes: input.as_bytes(),
             position: 0,
-            read_position: 0,
+            read_position: 1,
             tokens: vec![],
         }
     }

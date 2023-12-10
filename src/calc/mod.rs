@@ -80,6 +80,15 @@ mod tests {
     }
 
     #[test]
+    fn unaries() {
+        assert_evals!("-2", -2);
+        assert_evals!("--2", 2);
+        assert_evals!("+2", 2);
+        assert_evals!("-+-2", 2);
+        assert_evals!("--+-2", -2);
+    }
+
+    #[test]
     fn sums() {
         assert_evals!("3 + 2", 5);
         assert_evals!("3 - 2", 1);
