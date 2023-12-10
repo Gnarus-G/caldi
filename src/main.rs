@@ -51,7 +51,10 @@ impl AssistantInterface {
     }
 
     fn handle(self) -> anyhow::Result<()> {
-        let tts = Arc::new(Mutex::new(Tts::default()?));
+        let mut tts = Tts::default()?;
+        tts.speak("Welcome back!", false)?;
+
+        let tts = Arc::new(Mutex::new(tts));
         let _tts = Arc::clone(&tts);
 
         let host = cpal::default_host();
