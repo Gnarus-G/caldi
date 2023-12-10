@@ -48,3 +48,11 @@ Find and uncomment (by removing the # from in front of it) the line:
 ```sh
 festival --server &
 ```
+
+### Start Up in the background
+
+```sh
+festival --server &
+sleep 1 # give festival some time to boot up
+~/.cargo/bin/caldi assistant '<path to a ggml bin file>' 1> ~/cali.log &
+```
