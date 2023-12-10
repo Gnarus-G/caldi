@@ -120,11 +120,18 @@ impl AssistantInterface {
                                 .speak("Ready!", false)
                                 .expect("failed to speak");
 
-                            *state = ListenState::Listening;
+                            std::thread::sleep(std::time::Duration::from_secs(1));
+                            *state = ListenState::PreListening;
                             waiting_audio.clear();
                         } else if !text.to_lowercase().trim_start().starts_with("hey") {
                             waiting_audio.clear();
                         }
+                    }
+                    ListenState::PreListening => {
+                        // We just want to prevent any overlap from the tail of the
+                        // waiting phase that would pollute the start the Listening
+                        // causing the Listening phase to end early with nonsense in it
+                        *state = ListenState::Listening;
                     }
                     ListenState::Listening => {
                         let mut s = _speech_audio.lock().unwrap();
@@ -187,6 +194,7 @@ impl AssistantInterface {
 #[derive(Debug, PartialEq)]
 enum ListenState {
     Waiting,
+    PreListening,
     Listening,
     Transcribing,
 }
