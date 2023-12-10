@@ -169,7 +169,12 @@ impl AssistantInterface {
 
             let mut data = speech_audio.lock().unwrap();
 
-            let prompt = r#"[system] Get ready. The user will pose some math problems. [user]"#;
+            let prompt = r#"
+                [system] 
+                Get ready. The user will pose some math problems. 
+                Always transribe numbers as digits, and never letters, 
+                so, for example, if you hear 'five', write 5, and if you hear 'fifty' write '50', and so on...
+                [user]"#;
             let text = tr.transcribe(&data, prompt);
             let answer = eval(&text);
 
