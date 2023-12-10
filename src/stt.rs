@@ -5,9 +5,7 @@ pub struct Transcribe {
 }
 
 impl Transcribe {
-    pub fn new() -> Self {
-        let path_to_model = "./models/ggml-base.en.bin";
-
+    pub fn new(path_to_model: &str) -> Self {
         let ctx =
             WhisperContext::new_with_params(path_to_model, WhisperContextParameters::default())
                 .expect("failed to load model");

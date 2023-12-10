@@ -1,5 +1,6 @@
 use std::{
     io::{stdin, stdout, Write},
+    path::PathBuf,
     sync::{Arc, Condvar, Mutex},
 };
 
@@ -25,6 +26,10 @@ enum Command {
 
 #[derive(Args)]
 struct AssistantInterface {
+    /// Path to a ggml bin model file
+    language_model: PathBuf,
+
+    /// What the assistant responds to
     #[clap(long = "name", default_value = "Caldi")]
     assistant_name: String,
 }
@@ -72,7 +77,11 @@ impl AssistantInterface {
         let signal = Arc::new((Mutex::new(ListenState::Waiting), Condvar::new()));
         let _signal = Arc::clone(&signal);
 
-        let tr = Arc::new(stt::Transcribe::new());
+        let tr = Arc::new(stt::Transcribe::new(
+            self.language_model
+                .to_str()
+                .expect("received an invalid path for the language_model file"),
+        ));
         let _tr = Arc::clone(&tr);
 
         let input_stream = device.build_input_stream(
