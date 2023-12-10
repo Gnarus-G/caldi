@@ -230,7 +230,7 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 fn is_silence(samples: &[f32]) -> bool {
-    !samples.is_empty() && samples.iter().all(|sample| sample.abs() < 0.0005)
+    !samples.is_empty() && samples.iter().all(|sample| sample.abs() < 0.01)
 }
 
 fn err_fn(err: cpal::StreamError) {
