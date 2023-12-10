@@ -152,10 +152,16 @@ impl AssistantInterface {
 
             let prompt = r#"[system] Get ready. The user will pose some math problems. [user]"#;
             let text = tr.transcribe(&data, prompt);
-            let text = eval(&text);
+            let answer = eval(&text);
 
-            println!("[answer]: {text}");
-            tts.lock().unwrap().speak(text, false)?;
+            println!("[answer]: {answer:?}");
+
+            tts.lock().unwrap().speak(
+                answer
+                    .map(|a| a.to_string())
+                    .unwrap_or_else(|| "Sorry I couldn't evaluate that problem".to_string()),
+                false,
+            )?;
 
             *state = ListenState::Waiting;
             data.clear();
@@ -184,7 +190,14 @@ fn main() -> Result<(), anyhow::Error> {
 
                 let answer = eval(&line);
 
-                println!("{answer}");
+                answer
+                    .map(|ans| {
+                        println!("{ans}");
+                    })
+                    .unwrap_or_else(|| {
+                        println!("Something went wrong");
+                    });
+
                 print!(":> ");
                 stdout().flush()?;
             }
