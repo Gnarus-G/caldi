@@ -12,6 +12,7 @@ pub enum TokenKind {
 
 #[derive(Debug)]
 pub struct Token<'s> {
+    pub start: usize,
     pub kind: TokenKind,
     pub text: &'s str,
 }
@@ -78,34 +79,19 @@ impl<'s> Lexer<'s> {
         let c = match self.char() {
             Some(c) => c,
             None => {
-                self.tokens.push(Token {
-                    kind: TokenKind::Eof,
-                    text: "",
-                });
+                self.tokens.push(self.char_token(TokenKind::Eof));
                 return;
             }
         };
 
         let token = match c {
-            '+' => Token {
-                kind: TokenKind::Plus,
-                text: "+",
-            },
+            '+' => self.char_token(TokenKind::Plus),
 
-            '-' => Token {
-                kind: TokenKind::Minus,
-                text: "-",
-            },
+            '-' => self.char_token(TokenKind::Minus),
 
-            '*' => Token {
-                kind: TokenKind::Times,
-                text: "*",
-            },
+            '*' => self.char_token(TokenKind::Times),
 
-            '/' => Token {
-                kind: TokenKind::Over,
-                text: "/",
-            },
+            '/' => self.char_token(TokenKind::Over),
 
             c if c.is_ascii_digit() => {
                 let start = self.position;
@@ -119,6 +105,7 @@ impl<'s> Lexer<'s> {
                 let string = &self.input[start..=end];
 
                 Token {
+                    start,
                     kind: TokenKind::Integer,
                     text: string,
                 }
@@ -150,6 +137,7 @@ impl<'s> Lexer<'s> {
                     _ => {
                         string.split_whitespace().for_each(|ident| {
                             let token = Token {
+                                start,
                                 kind: TokenKind::Ident,
                                 text: ident,
                             };
@@ -160,17 +148,29 @@ impl<'s> Lexer<'s> {
                     }
                 };
 
-                Token { kind, text: string }
+                Token {
+                    start,
+                    kind,
+                    text: string,
+                }
             }
 
-            _ => Token {
-                kind: TokenKind::Illegal,
-                text: &self.input[self.position..self.position + 1],
-            },
+            _ => self.char_token(TokenKind::Illegal),
         };
 
         self.tokens.push(token);
 
         self.advance();
+    }
+
+    fn char_token(&self, kind: TokenKind) -> Token<'s> {
+        return Token {
+            start: self.position,
+            kind,
+            text: self
+                .input
+                .get(self.position..self.position + 1)
+                .unwrap_or_default(),
+        };
     }
 }

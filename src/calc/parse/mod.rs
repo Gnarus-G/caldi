@@ -75,7 +75,7 @@ impl<'s> Parser<'s> {
                         token: token.into(),
                     })
                 }
-                TokenKind::Eof => return Err(error::ErrorKind::UnexpectedEnd { at: 0 }),
+                TokenKind::Eof => return Err(error::ErrorKind::UnexpectedEnd { at: token.start }),
                 TokenKind::Illegal => {
                     self.advance(); // skipping any illegal characters
                     self.parse()?
@@ -258,7 +258,7 @@ pub mod error {
     impl From<&Token<'_>> for TokenKindAt {
         fn from(value: &Token<'_>) -> Self {
             Self {
-                position: 0,
+                position: value.start,
                 kind: value.kind,
             }
         }

@@ -1,0 +1,7 @@
+---
+source: src/calc/mod.rs
+description: 2 + * 2
+expression: prettied
+---
+2 + * 2    
+    ↳ unexpected token Times at position 4

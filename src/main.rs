@@ -11,8 +11,11 @@ use anyhow::Context;
 use calc::eval;
 use clap::{Args, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use notify_rust::{Notification, Timeout};
 use ringbuf::{LocalRb, Rb};
 use tts::Tts;
+
+use crate::calc::render_error;
 
 #[derive(Parser)]
 struct CLi {
@@ -183,12 +186,26 @@ impl AssistantInterface {
 
             println!("[answer]: {answer:?}");
 
-            tts.lock().unwrap().speak(
-                answer
-                    .map(|a| a.to_string())
-                    .unwrap_or_else(|err| err.to_string()),
-                false,
-            )?;
+            match answer {
+                Ok(a) => {
+                    tts.lock().unwrap().speak(a.to_string(), false)?;
+                }
+                Err(error) => {
+                    let e_fmtted = error.to_string();
+
+                    if let Err(err) = Notification::new()
+                        .summary("Caldi Error")
+                        .body(&render_error(error, &text))
+                        .timeout(Timeout::Milliseconds(6000))
+                        .show()
+                        .context("failed to send desktop notification")
+                    {
+                        eprintln!("[ERROR] {err:#}")
+                    }
+
+                    tts.lock().unwrap().speak(&e_fmtted, false)?;
+                }
+            }
 
             *state = ListenState::Waiting;
             data.clear();
@@ -222,9 +239,19 @@ fn main() -> Result<(), anyhow::Error> {
                     .map(|ans| {
                         println!("{ans}");
                     })
-                    .context("Something went wrong")
                     .unwrap_or_else(|e| {
-                        println!("{e:#}");
+                        let e_fmtted = render_error(e, &line);
+                        println!("{}", e_fmtted);
+
+                        if let Err(err) = Notification::new()
+                            .summary("Caldi Error")
+                            .body(&e_fmtted)
+                            .timeout(Timeout::Milliseconds(6000))
+                            .show()
+                            .context("failed to send desktop notification")
+                        {
+                            eprintln!("[ERROR] {err:#}")
+                        }
                     });
 
                 print!(":> ");

@@ -45,9 +45,33 @@ fn eval_unary_expr(expr: &UnaryExpr) -> isize {
     }
 }
 
+pub fn render_error(error: parse::error::ErrorKind, source: &str) -> String {
+    let mut output = String::new();
+
+    let location = match &error {
+        parse::error::ErrorKind::UnexpectedToken { token } => token.position,
+        parse::error::ErrorKind::UnexpectedEnd { at } => *at,
+    };
+
+    output.push_str(source);
+
+    output.push_str(&" ".repeat(location));
+    output.push('\n');
+    output.push_str(&" ".repeat(location));
+
+    output.push('↳');
+    output.push(' ');
+
+    output.push_str(&error.to_string());
+
+    output
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::calc::eval;
+    use insta::assert_display_snapshot;
+
+    use crate::calc::{eval, render_error};
 
     macro_rules! assert_evals {
         ($expr:literal, $ans:literal) => {
@@ -77,5 +101,23 @@ mod tests {
     #[test]
     fn pemdas() {
         assert_evals!("9 * 2 / 3 + 6 - 4 + 2", 10)
+    }
+
+    macro_rules! assert_error {
+        ($source:literal) => {
+            let source = $source;
+            let err = eval(source).unwrap_err();
+            let prettied = render_error(err, source);
+            insta::with_settings!({ description => source }, {
+                assert_display_snapshot!(prettied)
+            })
+        };
+    }
+
+    #[test]
+    fn errors() {
+        assert_error!("* 2");
+        assert_error!("/ 2");
+        assert_error!("2 + * 2");
     }
 }
