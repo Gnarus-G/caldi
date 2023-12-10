@@ -163,6 +163,8 @@ impl AssistantInterface {
             let text = tr.transcribe(&data, prompt);
             let answer = eval(&text);
 
+            println!("[problem]: {text}");
+
             println!("[answer]: {answer:?}");
 
             tts.lock().unwrap().speak(
