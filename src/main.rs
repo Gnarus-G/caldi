@@ -180,7 +180,7 @@ impl AssistantInterface {
                 so, for example, if you hear 'five', write 5, and if you hear 'fifty' write '50', and so on...
                 [user]"#;
             let text = tr.transcribe(&data, prompt);
-            let answer = eval(&text);
+            let answer = eval(&text.replace(',', ""));
 
             println!("[problem]: {text}");
 
