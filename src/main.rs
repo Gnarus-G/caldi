@@ -184,13 +184,13 @@ impl AssistantInterface {
 
             println!("[problem]: {text}");
 
-            println!("[answer]: {answer:?}");
-
             match answer {
-                Ok(a) => {
-                    tts.lock().unwrap().speak(a.to_string(), false)?;
+                Ok(ans) => {
+                    println!("[answer]: {ans}");
+                    tts.lock().unwrap().speak(ans.to_string(), false)?;
                 }
                 Err(error) => {
+                    println!("[answer]: {error}");
                     let e_fmtted = error.to_string();
 
                     if let Err(err) = Notification::new()
