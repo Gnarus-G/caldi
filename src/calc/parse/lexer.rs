@@ -2,6 +2,7 @@
 pub enum TokenKind {
     Ident,
     Integer,
+    Float,
     Minus,
     Times,
     Over,
@@ -96,7 +97,18 @@ impl<'s> Lexer<'s> {
             c if c.is_ascii_digit() => {
                 let start = self.position;
 
+                let mut is_float = false;
+
                 while self.peek_char().unwrap_or('\0').is_ascii_digit() {
+                    self.advance();
+                }
+
+                if self.peek_char().unwrap_or('\0') == '.' {
+                    self.advance();
+                }
+
+                while self.peek_char().unwrap_or('\0').is_ascii_digit() {
+                    is_float = true;
                     self.advance();
                 }
 
@@ -104,10 +116,18 @@ impl<'s> Lexer<'s> {
 
                 let string = &self.input[start..=end];
 
-                Token {
-                    start,
-                    kind: TokenKind::Integer,
-                    text: string,
+                if is_float {
+                    Token {
+                        start,
+                        kind: TokenKind::Float,
+                        text: string,
+                    }
+                } else {
+                    Token {
+                        start,
+                        kind: TokenKind::Integer,
+                        text: string,
+                    }
                 }
             }
 

@@ -62,7 +62,8 @@ impl<'s> Parser<'s> {
                     self.advance(); // skipping identifiers
                     self.parse()?
                 }
-                TokenKind::Integer => self.parse_number(),
+                TokenKind::Float => self.parse_fp_number(),
+                TokenKind::Integer => self.parse_integer(),
                 TokenKind::Plus => self.parse_unary_expr()?,
                 TokenKind::Minus => self.parse_unary_expr()?,
                 TokenKind::Times => {
@@ -103,14 +104,6 @@ impl<'s> Parser<'s> {
         Ok(exp)
     }
 
-    fn parse_number(&self) -> Expr {
-        let token = self.token().unwrap();
-
-        Expr::Interger(token.text.parse().expect(
-            "failed to parse an ostensibly properly tokenized interger (should not happen)",
-        ))
-    }
-
     fn parse_unary_expr(&mut self) -> Result<Expr> {
         let op: ast::UnOp = match self.token().map(|t| t.try_into()) {
             Some(Ok(op)) => op,
@@ -147,6 +140,26 @@ impl<'s> Parser<'s> {
             right: self.parse_expr(op.into())?,
         })))
     }
+
+    fn parse_fp_number(&self) -> Expr {
+        let token = self.token().unwrap();
+
+        Expr::Integer(
+            token.text.parse().expect(
+                "failed to parse an ostensibly properly tokenized integer (should not happen)",
+            ),
+        )
+    }
+
+    fn parse_integer(&self) -> Expr {
+        let token = self.token().unwrap();
+
+        Expr::Float(
+            token.text.parse().expect(
+                "failed to parse an ostensibly properly tokenized floating point number (should not happen)",
+            ),
+        )
+    }
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd)]
@@ -181,7 +194,8 @@ pub mod ast {
 
     #[derive(Debug)]
     pub enum Expr {
-        Interger(isize),
+        Integer(isize),
+        Float(f64),
         BinExpr(Box<BinaryExpr>),
         UnExpr(Box<UnaryExpr>),
     }
