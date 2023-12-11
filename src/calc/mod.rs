@@ -60,7 +60,7 @@ impl Div for Value {
 
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Value::Integer(l), Value::Integer(r)) => (l / r).into(),
+            (Value::Integer(l), Value::Integer(r)) => (l as f64 / r as f64).into(),
             (Value::Integer(l), Value::Float(r)) => (l as f64 / r).into(),
             (Value::Float(l), Value::Integer(r)) => (l / r as f64).into(),
             (Value::Float(l), Value::Float(r)) => (l / r).into(),

@@ -144,7 +144,7 @@ impl<'s> Parser<'s> {
     fn parse_fp_number(&self) -> Expr {
         let token = self.token().unwrap();
 
-        Expr::Integer(
+        Expr::Float(
             token.text.parse().expect(
                 "failed to parse an ostensibly properly tokenized integer (should not happen)",
             ),
@@ -154,7 +154,7 @@ impl<'s> Parser<'s> {
     fn parse_integer(&self) -> Expr {
         let token = self.token().unwrap();
 
-        Expr::Float(
+        Expr::Integer(
             token.text.parse().expect(
                 "failed to parse an ostensibly properly tokenized floating point number (should not happen)",
             ),

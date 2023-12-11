@@ -104,11 +104,11 @@ impl<'s> Lexer<'s> {
                 }
 
                 if self.peek_char().unwrap_or('\0') == '.' {
+                    is_float = true;
                     self.advance();
                 }
 
                 while self.peek_char().unwrap_or('\0').is_ascii_digit() {
-                    is_float = true;
                     self.advance();
                 }
 
