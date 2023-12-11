@@ -209,6 +209,7 @@ mod tests {
         assert_evals!("89 * 34 * 23 * 199", 13850002);
         assert_evals!("9 / 2", 4.5);
         assert_evals!("256 * 9 / 2", 1152);
+        assert_evals!("2 + 9 x 2", 20);
     }
 
     #[test]

@@ -148,20 +148,16 @@ impl<'s> Lexer<'s> {
 
                 let kind = match string.trim() {
                     "plus" => TokenKind::Plus,
-                    "minus" => TokenKind::Minus,
-                    "times" => TokenKind::Times,
-                    "over" => TokenKind::Over,
-                    "negative" => TokenKind::Minus,
-                    "multiplied by" => TokenKind::Times,
-                    "divided by" => TokenKind::Over,
+                    "minus" | "negative" => TokenKind::Minus,
+                    "times" | "x" | "multiplied by" => TokenKind::Times,
+                    "over" | "divided by" => TokenKind::Over,
                     _ => {
                         string.split_whitespace().for_each(|ident| {
                             let kind = match ident {
                                 "plus" => TokenKind::Plus,
-                                "minus" => TokenKind::Minus,
-                                "times" => TokenKind::Times,
+                                "minus" | "negative" => TokenKind::Minus,
+                                "times" | "x" => TokenKind::Times,
                                 "over" => TokenKind::Over,
-                                "negative" => TokenKind::Minus,
                                 _ => TokenKind::Ident,
                             };
 
