@@ -156,9 +156,18 @@ impl<'s> Lexer<'s> {
                     "divided by" => TokenKind::Over,
                     _ => {
                         string.split_whitespace().for_each(|ident| {
+                            let kind = match ident {
+                                "plus" => TokenKind::Plus,
+                                "minus" => TokenKind::Minus,
+                                "times" => TokenKind::Times,
+                                "over" => TokenKind::Over,
+                                "negative" => TokenKind::Minus,
+                                _ => TokenKind::Ident,
+                            };
+
                             let token = Token {
                                 start,
-                                kind: TokenKind::Ident,
+                                kind,
                                 text: ident,
                             };
                             self.tokens.push(token);

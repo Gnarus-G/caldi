@@ -176,6 +176,13 @@ mod tests {
     }
 
     #[test]
+    fn ops_in_letters() {
+        assert_evals!("minus 3", -3);
+        assert_evals!("negative 3", -3);
+        assert_evals!("2 plus 2 times 3 minus 1 over 2 minus negative 5", 12.5);
+    }
+
+    #[test]
     fn unaries() {
         assert_evals!("-2", -2);
         assert_evals!("--2", 2);
@@ -206,7 +213,11 @@ mod tests {
 
     #[test]
     fn pemdas() {
-        assert_evals!("9 * 2 / 3 + 6 - 4 + 2", 10)
+        assert_evals!("9 * 2 / 3 + 6 - 4 + 2", 10);
+        assert_evals!("2 + 2 / 2 - - 2", 5);
+        assert_evals!("2 + 2 * 3 - 1 / 2 - - 5", 12.5);
+        assert_evals!("3 - 1 / 2 - 5", -2.5);
+        assert_evals!("-3 - 1 / 2 - 5", -8.5)
     }
 
     macro_rules! assert_error {

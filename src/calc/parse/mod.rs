@@ -85,20 +85,24 @@ impl<'s> Parser<'s> {
             None => return Err(error::ErrorKind::UnexpectedEnd { at: 0 }),
         };
 
-        let peek_precedence: Precedence = match self.peek_token().map(|t| t.try_into()) {
-            Some(Ok(p)) => p,
-            Some(Err(_)) => return Ok(exp),
-            None => return Ok(exp),
-        };
+        loop {
+            let peek_precedence: Precedence = match self.peek_token().map(|t| t.try_into()) {
+                Some(Ok(p)) => p,
+                Some(Err(_)) => return Ok(exp),
+                None => return Ok(exp),
+            };
 
-        while self
-            .peek_token()
-            .map(|t| t.kind != TokenKind::Eof)
-            .unwrap_or(false)
-            && curr_precedence < peek_precedence
-        {
-            self.advance();
-            exp = self.parse_binary_expr(exp)?;
+            if self
+                .peek_token()
+                .map(|t| t.kind != TokenKind::Eof)
+                .unwrap_or(false)
+                && curr_precedence < peek_precedence
+            {
+                self.advance();
+                exp = self.parse_binary_expr(exp)?;
+            } else {
+                break;
+            }
         }
 
         Ok(exp)
@@ -117,7 +121,7 @@ impl<'s> Parser<'s> {
 
         self.advance();
 
-        let number = self.parse()?;
+        let number = self.parse_expr(Precedence::Prefix)?;
         Ok(Expr::UnExpr(Box::new(UnaryExpr { op, right: number })))
     }
 
@@ -168,6 +172,7 @@ enum Precedence {
     None,
     Sum,
     Product,
+    Prefix,
 }
 
 impl From<BinOp> for Precedence {
@@ -190,9 +195,10 @@ impl<'t, 's> TryFrom<&'t Token<'s>> for Precedence {
 }
 
 pub mod ast {
+    use std::fmt::Debug;
+
     use super::lexer::Token;
 
-    #[derive(Debug)]
     pub enum Expr {
         Integer(isize),
         Float(f64),
@@ -200,25 +206,57 @@ pub mod ast {
         UnExpr(Box<UnaryExpr>),
     }
 
-    #[derive(Debug)]
+    impl Debug for Expr {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Expr::Integer(number) => write!(f, "{number}"),
+                Expr::Float(number) => write!(f, "{number}"),
+                Expr::BinExpr(expr) => write!(f, "{expr:?}"),
+                Expr::UnExpr(expr) => write!(f, "{expr:?}"),
+            }
+        }
+    }
+
     pub struct BinaryExpr {
         pub left: Expr,
         pub op: BinOp,
         pub right: Expr,
     }
 
-    #[derive(Debug)]
+    impl Debug for BinaryExpr {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "({:?} {:?} {:?})", self.left, self.op, self.right)
+        }
+    }
+
     pub struct UnaryExpr {
         pub op: UnOp,
         pub right: Expr,
     }
 
-    #[derive(Debug, Clone, Copy)]
+    impl Debug for UnaryExpr {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "({:?}{:?})", self.op, self.right)
+        }
+    }
+
+    #[derive(Clone, Copy)]
     pub enum BinOp {
         Plus,
         Minus,
         Times,
         Over,
+    }
+
+    impl Debug for BinOp {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                BinOp::Plus => write!(f, "+"),
+                BinOp::Minus => write!(f, "-"),
+                BinOp::Times => write!(f, "*"),
+                BinOp::Over => write!(f, "/"),
+            }
+        }
     }
 
     impl<'t, 's> TryFrom<&'t Token<'s>> for BinOp {
@@ -237,10 +275,18 @@ pub mod ast {
         }
     }
 
-    #[derive(Debug)]
     pub enum UnOp {
         Plus,
         Minus,
+    }
+
+    impl Debug for UnOp {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                UnOp::Plus => write!(f, "+"),
+                UnOp::Minus => write!(f, "-"),
+            }
+        }
     }
 
     impl<'t, 's> TryFrom<&'t Token<'s>> for UnOp {
