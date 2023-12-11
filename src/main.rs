@@ -187,21 +187,14 @@ impl AssistantInterface {
             match answer {
                 Ok(ans) => {
                     println!("[answer]: {ans}");
+                    notify("Caldi Answer", &format!("{text}\n = {ans}"));
                     tts.lock().unwrap().speak(ans.to_string(), false)?;
                 }
                 Err(error) => {
                     println!("[answer]: {error}");
                     let e_fmtted = error.to_string();
 
-                    if let Err(err) = Notification::new()
-                        .summary("Caldi Error")
-                        .body(&render_error(error, &text))
-                        .timeout(Timeout::Milliseconds(6000))
-                        .show()
-                        .context("failed to send desktop notification")
-                    {
-                        eprintln!("[ERROR] {err:#}")
-                    }
+                    notify("Caldi Error", &render_error(error, &text));
 
                     tts.lock().unwrap().speak(&e_fmtted, false)?;
                 }
@@ -243,15 +236,7 @@ fn main() -> Result<(), anyhow::Error> {
                         let e_fmtted = render_error(e, &line);
                         println!("{}", e_fmtted);
 
-                        if let Err(err) = Notification::new()
-                            .summary("Caldi Error")
-                            .body(&e_fmtted)
-                            .timeout(Timeout::Milliseconds(6000))
-                            .show()
-                            .context("failed to send desktop notification")
-                        {
-                            eprintln!("[ERROR] {err:#}")
-                        }
+                        notify("Caldi Error", &e_fmtted);
                     });
 
                 print!(":> ");
@@ -269,4 +254,16 @@ fn is_silence(samples: &[f32]) -> bool {
 
 fn err_fn(err: cpal::StreamError) {
     eprintln!("[ERROR] an error occurred on stream: {}", err);
+}
+
+fn notify(title: &str, body: &str) {
+    if let Err(err) = Notification::new()
+        .summary(title)
+        .body(body)
+        .timeout(Timeout::Milliseconds(6000))
+        .show()
+        .context("failed to send desktop notification")
+    {
+        eprintln!("[ERROR] {err:#}")
+    }
 }
