@@ -2,9 +2,14 @@
 
 Voice commanded calculator in the terminal.
 
-## Setup Whisper
+## Demo
+
+https://github.com/Gnarus-G/caldi/assets/37311893/f7f8dfcc-f058-4769-929e-f59247895ed0
+
+## Setup Whisper Dependencies
 
 [OpenCL](https://github.com/ggerganov/whisper.cpp/#opencl-gpu-support-via-clblast)
+Assuming a non Nvidia GPU.
 
 ```sh
 sudo pacman -S opencl clinfo clblast
@@ -15,6 +20,10 @@ sudo pacman -S opencl clinfo clblast
 ```sh
 sudo pacman -S openblas
 ```
+
+### To get the required Whisper models
+
+Follow the [quickstart](https://github.com/ggerganov/whisper.cpp/#quick-start) from [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
 
 ## Setup TTS
 
@@ -56,3 +65,7 @@ festival --server &
 sleep 1 # give festival some time to boot up
 ~/.cargo/bin/caldi assistant '<path to a ggml bin file>' 1> ~/caldi.log &
 ```
+
+## Notice on supported systems
+
+Only tested on Arch linux, but could work on other distros with a little more effort.

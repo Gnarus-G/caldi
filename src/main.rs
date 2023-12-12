@@ -30,7 +30,9 @@ enum Command {
 
 #[derive(Args)]
 struct AssistantInterface {
-    /// Path to a ggml bin model file
+    /// Path to a ggml bin model file.
+    /// Follow the quickstart (https://github.com/ggerganov/whisper.cpp/#quick-start)
+    /// from whisper.cpp to get one of these
     language_model: PathBuf,
 
     /// What the assistant responds to
