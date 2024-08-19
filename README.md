@@ -69,3 +69,8 @@ sleep 1 # give festival some time to boot up
 ## Notice on supported systems
 
 Only tested on Arch linux, but could work on other distros with a little more effort.
+
+## References
+- https://github.com/rhasspy/piper
+- https://github.com/coqui-ai/TTS
+- https://github.com/yl4579/StyleTTS2
